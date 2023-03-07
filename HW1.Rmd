@@ -1,0 +1,124 @@
+---
+title: 'MA 611 HW1: Delta Flights Analysis'
+author: "Ria Nisar"
+date: "02/13/2022"
+output: html_document
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+library(fpp2)
+```
+ 
+```{r}
+df = read.csv("flights.csv")
+```
+
+## In this notebook we call data of 3 airlines. The airlines being Delta, AA and JetBlue. We track the number of flights departing from Boston Logan Airport for the year of 2021 and 2022. The analysis will focus only on data from Delta. 
+
+```{r}
+print (c ("Number of columns: ", ncol (df)))
+print (colnames (df))
+```
+```{r}
+str (df)
+```
+```{r}
+print (colSums (is.na (df)))
+```
+```{r}
+summary (df)
+```
+
+## We see that there are 669 observations in 5 columns with no null values.
+
+```{r}
+delta = ts(df$Delta, start=2021, frequency=669)
+```
+```{r}
+print(delta)
+```
+```{r}
+fig = autoplot(delta) + 
+  ggtitle("Daily Delta Flights in 2021 and 2022") +
+  xlab("Year") +
+  ylab("Number of Flights")
+```
+```{r}
+print(fig)
+```
+##After analysing the graph, we come to know that there is a clear upward trend. The number of flights in 2021 are relatively low but they start increasing gradually and in 2022, there is a significant outflow of flight departures. The low number of flights in 2021 could be attested to COVID. After the effect of COVID laxed by mid 2021 when vaccines were rolled out, domestic and international travel restrictions were waived off. This might have resulted in the number of flights significantly increasing. 
+##Speaking about seasonality, it can be seen from the graph that weekends clearly affect the number of flights. This can be due to the fact that flights on weekends are priced relatively higher. Flying during mid week can reduce ticket prices by 12% - 20%.
+##Talking about cyclic behaviour, there have been irregular ups and lows but the amount of change is inconsistent. After rebounding from the pandemic, a lot of flights took off during October and November of 2021 and June and during the holiday season. 
+##There were relatively less flights flying during the summers, maybe because during that period a lot of flights were being cancelled or delayed owing to staff shortages or pilots being on strike. Holidays like Thanksgiving, Christmas, New Years usually see a heavy efflux of travellers and thus the flights during that period have been more. 
+
+
+```{r}
+delta1 = ts(df$Delta, frequency=7)
+```
+
+```{r}
+fig1 = ggseasonplot(delta1) +
+    ggtitle("Daily Delta Departures") +
+    ylab("Flight Departures") +
+    theme(legend.position = "none")
+```
+```{r}
+print(fig1)
+```
+
+##The above plot was created to scrutinise weekly seasonality. It can be inferred from the plot that weekly seasonality is confirmed. The highest number of flights can be seen on Wednesday and the lowest on Sunday. This can be accounted for by the fact that flying on Tuesdays and Wednesdays is relatively cheaper. For economy tickets, Tuesdays are about 24% lower than peak prices on Sundays, which translates to savings of about $85 per ticket.
+##The same is generally true for business class and first class travellers. A lot of conscious travellers also want to avoid weekend rush if they are going on a vacation and thus might fly during the middle of the week. 
+
+
+```{r}
+delta1.naive = naive(delta1, h=15)
+delta1.snaive = snaive(delta1, h=15)
+delta1.meanf = meanf(delta1, h=15)
+```
+```{r}
+print(delta1.naive)
+print(delta1.snaive)
+print(delta1.meanf)
+```
+##After considering the three simple prediction strategies, the value for seasonal naive is the lowest, and hence, the most appropriate strategy pertaining to our data. As we can see, forecasting using the mean of all the values on the time series does not seem a realistic prediction.
+
+```{r}
+delta1.naive.RMSE = round(accuracy(delta1.naive), 2)
+delta1.snaive.RMSE = round(accuracy(delta1.snaive), 2)
+delta1.meanf.RMSE = round(accuracy(delta1.meanf), 2)
+```
+```{r}
+print(delta1.naive.RMSE)
+print(delta1.snaive.RMSE)
+print(delta1.meanf.RMSE)
+```
+##After probing into the RMSE and MAE values, the value for seasonal naive is the lowest and thus, reinforcing the fact that seasonal naive is the most relevant prediction method in our case. 
+
+
+```{r}
+delta1.naive.nov15 = delta1.naive$mean[15]
+delta1.snaive.nov15 = delta1.snaive$mean[15]
+delta1.meanf.nov15 = delta1.meanf$mean[15]
+```
+
+```{r}
+print(delta1.naive.nov15)
+print(delta1.snaive.nov15)
+print(delta1.meanf.nov15)
+```
+##The above data helps us understand the forecast values for November 15, 2022.
+
+```{r}
+fig2 = autoplot(delta1, color="blue") +
+    autolayer(fitted(delta1.naive), series="Naive") + 
+    autolayer(fitted(delta1.snaive), series="Seasonal Naive") + 
+    autolayer(fitted(delta1.meanf), series="Constant Mean") + 
+    ggtitle("Delta Flights (Sample Predictions)") 
+```
+
+```{r}
+print(fig2)
+```
+##The above plot serves as a visual aid to compare in-sample prediction strategies. It is clear that the seasonal naive method fits better to the validation data.
+
+##Conclusion - After exploring the data and investigating seasonal plots and prediction methods, we can conclude that there is weekly seasonality and implementing the seasonal naive method is the best moving forward. Due to the seasonal and trend component in the data, it is preferable the seasonal naive method than the naive method.
