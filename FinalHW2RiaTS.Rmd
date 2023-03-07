@@ -1,0 +1,191 @@
+---
+title: "Homework 2"
+author: "Ria Nisar"
+date: "2023-03-06"
+output: html_document 
+---
+
+###Q. An introduction to the data set and overview of contents in the analysis
+
+```{r}
+library(fpp2)
+library(ggplot2)
+library(forecast)
+```
+```{r}
+gas_prices <- read.csv("regular_gas.csv")
+```
+
+```{r}
+head(gas_prices)
+str(gas_prices)
+summary(gas_prices)
+```
+
+##The dataset contains the monthly average prices of US regular gasoline from January 2000 to December 2019. It has two columns titled 'date' and 'price' with 240 observations. The dataset contains 240 rows, one for each month between January 2000 and December 2019. The date column is in a MON-YY format, and the price column represents the average price per gallon for regular gasoline (USD) for that month.
+
+##The summary() function helps us to to understand that the average price per gallon of regular gasoline over the entire period is $2.447. The minimum price is $1.072, and the maximum price is $4.002. The median price is $2.468.
+
+
+
+###Q. A nice plot of the monthly gasoline prices time series and a qualitative description
+
+```{r}
+ts_gas_prices <- ts(gas_prices$price, frequency = 12, start = c(2000,1))
+```
+```{r, echo=FALSE, fig.align='center'}
+plot = autoplot(ts_gas_prices, color="red") + 
+  xlab("Date") +
+  ylab("Price (USD/gallon)") +
+  ggtitle("Monthly US Regular Gasoline Prices (Jan 2000 - Dec 2019)")
+
+print(plot)
+```
+
+##The plot provides a useful visualization of the gasoline prices data and can help us to identify trends and patterns in the data. The x-axis shows the time period in years, and the y-axis shows the price of gasoline in US dollars per gallon.
+
+##Trend: It can be inferred from the plot generated that there are notes of an upward trend. Prices were relatively stable in the early 2000's from 2000 to 2004 and began to increase sharply in 2005. The increase was seen till 2008 where the proces touched $4 per gallon. After peaking in mid-2008, prices saw a dip in 2008-2009. This could be caused due to the financial instability which occured during the time which had pushed the market in a recession. It gradually started recovering and stabalised in 2010-2014 (price range: $2.50-$3.50). Prices then fell again from 2014 to 2016, before rising somewhat in 2017-2018 and stabilizing again in 2019.
+
+##Seasonality: There is a noticeable seasonality pattern. One can deduce that the gasoline prices during the summer preiod are higher than the winter months. This can be because of the switch from winter grade fuel to summer grade fuel. Vacationing also increases during the summer which may cause an icreased demand and a hike in the prices.
+
+##Cyclic Behaviour: We can observe cycles of roughly four to five years in the dataset where the gasoline prices go up and down. This cyclic behavior can be caused by various factors such as changes in the global oil markets, geopolitical events, or natural disasters.
+
+##Level: Non constant level since the average value of the series is changing over time. Absence of consistent mean. 
+
+```{r, echo=FALSE, fig.align='center'}
+gas.window1 = window(ts_gas_prices, start = 2000, end = 2010)
+autoplot(gas.window1)
+```
+
+```{r, echo=FALSE, fig.align='center'}
+gas.window2 = window(ts_gas_prices, start = 2011, end = 2019)
+autoplot(gas.window2)
+```
+```{r, echo=FALSE, fig.align='center'}
+gas.seasonal.fig = ggseasonplot(ts_gas_prices) +
+  ggtitle("Seasonal Plot") +
+  ylab("Monthly Gasoline Prices (in USD)")
+
+print(gas.seasonal.fig)
+```
+
+##The plots generated show both trend and seasonality. From the first window, we can see that the gasoline prices showed an upward trend from 2000 to 2010, with some seasonal variations and occasional spikes. From the second window, we can see that gasoline prices were relatively stable from 2011 to 2014, after which they started to decrease gradually until 2016, followed by a slight increase until 2019. From the seasonal plot generated, we can deduce that the prices of gasoline for the summer months (June to August) were higher than the winter months (December-February)
+
+
+
+###Q. An additive decomposition of the time series. Comment on the success and limitations of the decomposition. Do you believe trend and seasonality exist in US gasoline prices based on the plot and strength of components? You should use the classical fitting. For extra points, repeat using an STL fitting and compare
+
+```{r, echo=FALSE, fig.align='center'}
+dc_gas_prices <- decompose(ts_gas_prices, type = "additive")
+autoplot(dc_gas_prices)
+```
+
+```{r}
+head(ts_gas_prices - dc_gas_prices$trend - dc_gas_prices$seasonal, 15)
+head(dc_gas_prices$random, 15)
+```
+
+```{r, echo=FALSE, fig.align='center'}
+GP_add = 1- var(dc_gas_prices$random, na.rm = T) / var(dc_gas_prices$trend + dc_gas_prices$random, na.rm = T)
+GSP_add = 1- var(dc_gas_prices$random, na.rm = T) / var(dc_gas_prices$seasonal + dc_gas_prices$random, na.rm = T)
+```
+
+##Comment on success and limitations of the decomposition: The model is useful in helping us understand the patterns of trend and seasonality. There is a certain level of linear seasonality. The limitations of the model are that it might be sensitive to outliers. It smoothes the moving average out so might not be able to capture all sources of variation in the time series.
+
+##Comment on trend and seasonality: The plot generated confirms the presence of trend and seasonality. The trend component clearly speaks to a upward trend,consistent with what we observed in the earlier time series plot.The estimated seasonal component shows a pattern of higher prices in the summer months and lower prices in the winter months, consistent with the earlier seasonal plot.
+
+##The Strength of Trend is "GP_add" and Strength of Seasonality is "GSP_add". The GP_add value being so close to 1 indicates that the trend component is accounting for a large proportion of the variability. With the GSP_add value being so close to 0, the seasonal component is relatively less important while explaining variation.
+
+##The code for STL fitting-
+
+```{r, echo=FALSE, fig.align='center'}
+dc_gas_prices_stl <- stl(ts_gas_prices, s.window = 3, t.window = 10)
+autoplot(dc_gas_prices_stl)
+```
+
+##The STL fitting results in a smoother decomposition of the data compared to the classical fitting. Since it generates a more pronounced plot, its more appropriate for capturing the changing amplitude of the seasonal pattern over time. It accounts for non constant seasonality. 
+
+
+
+###Q. A thorough investigation into the application of the three exponential smoothing models discussed in class to US gasoline prices. Select an appropriate model, interpret the smoothing parameters, comment on the residuals and success of the model. Compare the in-sample accuracy against an appropriate simple strategy
+
+#Exponential Smoothing (Simple, Double and Triple Exponential Smoothing)
+
+#Code for Non Constant, Holt and Holt Winters Method
+```{r}
+fit_ses <- ses(ts_gas_prices)
+accuracy_ses <- accuracy(fit_ses)
+```
+```{r}
+gas.prices.holt = holt(ts_gas_prices)
+accuracy_holt <- accuracy(gas.prices.holt)
+```
+```{r, echo=FALSE, fig.align='center'}
+ggAcf(resid(fit_ses))
+```
+```{r, echo=FALSE, fig.align='center'}
+ggAcf(resid(gas.prices.holt))
+```
+
+```{r, echo=FALSE, fig.align='center'}
+gas.prices.hw = hw(ts_gas_prices)
+gas.prices.hw.1year = hw(ts_gas_prices, h=12)
+
+holtplot = autoplot(ts_gas_prices, series = "Data") + autolayer(fitted(gas.prices.hw), series = "Holt Winters") + autolayer(fitted(gas.prices.holt), series = "Holt") + 
+ggtitle("Holt v/s Holt Winters") +ylab("Gasoline prices")
+print(holtplot)
+```
+```{r, echo=FALSE, fig.align='center'}
+gasprices.hwprediction = autoplot(ts_gas_prices, color="green") + autolayer(fitted(gas.prices.hw), series="Holt-Winters - fitted ") + autolayer(gas.prices.hw.1year, series = "Holt- Winters - prediction") + ggtitle("Holt Winters Model for US Gasoline Prices") + ylab("Gasoline Prices")
+
+print(gasprices.hwprediction)
+```
+
+##Application of the 3 exponential smoothing models: Using simple exponential smoothing model will not be fruitful in our case since the simple method assumes that data has no trend or seasonality but we have already established the. presence of both in our model. The double exponential method (Holt) would be used if there is no seasonality and only the trend component. Thus for our data, using the triple exponential method (Holt Winters) would be the most appropriate since it takes into account both trend and seasonality; elements present in our dataset. The Holt Winters model is also robust to unexpected changes or anomalies in the data and is good metric to use for short term forecasting tasks since it captures both trend and seasonality. 
+
+```{r, echo=FALSE, fig.align='center'}
+summary(gas.prices.hw)
+accuracy(gas.prices.hw)
+ggAcf(resid(gas.prices.hw))
+autoplot(resid(gas.prices.hw))
+```
+
+##Appropriate model selected: Holt Winters
+
+##The Holt-Winters model outperforms the SES and Holt models in terms of RMSE, MAE, and MASE values. 
+##Interpretation of the Smoothing Parameters: Since alpha is close to 1, model is highly responsive to recent changes in the data by placing more weight on recent observations. With the beta value being close to 0, it indicates that the model is placing less weight to trend component of the data. With the gamma level being extremely low, it suggests that it is placing relatively more weight on recent changes in the seasonal component of the time series.
+
+##Comment on the Residuals: After plotting the residuals, we see that the majority of the residuals are relatively small, with only a few outliers. Residuals may be present due to some unaccounted data being influenced by external factors. 
+
+##Comment on the Success of the model: The plot shows that Holt-Winters' method captures the seasonality and trend in the data better than Holt's linear method. With the ME value being 0.0024 and RMSE value being 0.161, the models prediction are off only by a minute value. Comparing autocorrelation, we see that the Holt Linear and Simple Exponential model do not fully capture the patterns in the data. The Holt Winters model does not show any significant autocorrelation in the residuals at any of the lags (except possibly at lag 1) and thus outperforms the other two models. 
+
+##Compare the in-sample accuracy against an appropriate simple strategy: Seasonal naive will perform better than naive and meanf since the data exhibits strong seasonal patterns, as it takes into account the seasonal fluctuations in the data. Seasonal naive will take use the most recent observation from the same season as the forecast for the next period.
+
+```{r}
+gas.snaive = snaive(ts_gas_prices)
+```
+```{r}
+gas.snaive.RMSE = round(accuracy(gas.snaive)[2], 2)
+gas.prices.hw.RMSE = accuracy(gas.prices.hw)[2]
+```
+```{r, echo=FALSE, fig.align='center'}
+fig = autoplot(ts_gas_prices, series = "Original") + autolayer(fitted(gas.prices.hw), series = "Holt Winters") +   autolayer(fitted(gas.snaive), series = "Seasonal Naive") +
+  ggtitle("Comparision of Holt-Winters vs Seasonal Naive Mthod") + ylab("Gas Prices (USD/Gallon)") + xlab("Years")
+print(fig)
+```
+
+##A lower RMSE value indicates better accuracy of the model in predicting future values. Since the RMSE of Holt Winters is 0.16 compared to the RMSE value of the snaive being 0.54, Holt Winters is a more accurate method of measurement to predict future values. The plot formed also confirms that Holt Winters is a better fit than Seasonal Naive since the Seasonal Naive method is not accurately accounting for seasonal variation in the data. 
+
+
+
+###Q. A nice plot of US gasoline prices and one year of forecasts using the model previously selected. Make sure the plot has good labels.
+
+```{r, echo=FALSE, fig.align='center'}
+gas.hw <- hw(ts_gas_prices)
+gas.hw.forecast <- forecast(gas.hw, h = 12)
+autoplot(gas.hw.forecast, xlab = "Year", ylab = "Gasoline Prices (in USD)", main = "US Gasoline Prices Forecast (Holt-Winters)")
+```
+##The plot shows that the forecasted gasoline prices are expected to gradually increase over the next year. The forecasted values follow the general trend of the historical data. 
+
+
+####Conclusion: After applying various time series methods to analyze the US gasoline prices dataset, we can conclude the presence of a non constant trend and a seasonal pattern. Careful analysis showed that the Holt-Winters' exponential smoothing method provided the best fit to the data and accurately forecasted gasoline prices for one year.
